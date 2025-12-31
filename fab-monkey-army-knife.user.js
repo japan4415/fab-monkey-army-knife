@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Fab Monkey Army Knife (Sample)
 // @namespace    https://github.com/japan4415/fab-monkey-army-knife
-// @version      0.2.2
+// @version      0.2.3
 // @description  Improve the Flesh and Blood official site and GEM history UX.
 // @match        https://fabtcg.com/*
 // @match        https://www.fabtcg.com/*
@@ -21,18 +21,12 @@
   const STATUS_ID = 'fab-history-csv-status';
   const COPY_ID = 'fab-history-csv-copy';
   const HISTORY_COLUMNS = [
-    'event_id',
-    'date',
     'title',
     'start_time',
     'store',
     'event_type',
     'format',
-    'xp_multiplier',
-    'rating',
-    'total_wins',
-    'total_xp',
-    'matches',
+    'match_record',
   ];
   let historyLoadPromise = null;
   let historyEntries = [];
@@ -210,11 +204,7 @@
         store: metaItems[1] || '',
         event_type: metaItems[2] || '',
         format: metaItems[3] || '',
-        xp_multiplier: metaItems[4] || '',
-        rating: metaItems[5] || '',
-        total_wins: results.total_wins,
-        total_xp: results.total_xp,
-        matches: results.matches,
+        match_record: results.match_record,
       };
       return entry;
     }).filter((entry) => entry.title || entry.date);
@@ -223,37 +213,29 @@
   function extractResultsFromEvent(event) {
     const details = event.querySelector('.event__extra-details');
     if (!details) {
-      return { total_wins: '', total_xp: '', matches: '' };
+      return { match_record: '' };
     }
     const tables = Array.from(details.querySelectorAll('table'));
-    const summary = parseSummaryTable(tables[0]);
-    const matches = parseMatchTable(tables[1]);
+    const matchTable = findMatchTable(tables);
+    const matches = parseMatchTable(matchTable);
+    const lastMatch = matches[matches.length - 1];
     return {
-      total_wins: summary.total_wins,
-      total_xp: summary.total_xp,
-      matches: serializeMatches(matches),
+      match_record: lastMatch ? lastMatch.record : '',
     };
   }
 
-  function parseSummaryTable(table) {
-    if (!table) {
-      return { total_wins: '', total_xp: '' };
-    }
-    const summary = { total_wins: '', total_xp: '' };
-    const rows = Array.from(table.querySelectorAll('tr'));
-    for (const row of rows) {
-      const label = normalizeText(row.querySelector('th')?.textContent);
-      const value = normalizeText(row.querySelector('td')?.textContent);
-      if (!value) {
+  function findMatchTable(tables) {
+    for (const table of tables) {
+      const rows = Array.from(table.querySelectorAll('tr'));
+      if (rows.length <= 1) {
         continue;
       }
-      if (label.toLowerCase().includes('xp')) {
-        summary.total_xp = value;
-      } else if (!summary.total_wins) {
-        summary.total_wins = value;
+      const headerCells = rows[0].querySelectorAll('th');
+      if (headerCells.length >= 2) {
+        return table;
       }
     }
-    return summary;
+    return null;
   }
 
   function parseMatchTable(table) {
@@ -279,19 +261,10 @@
         round: cells[0] || '',
         opponent: cells[1] || '',
         result: cells[2] || '',
-        record: cells[3] || '',
+        record: normalizeRecord(cells[3] || ''),
       });
     }
     return matches;
-  }
-
-  function serializeMatches(matches) {
-    if (!matches || matches.length === 0) {
-      return '';
-    }
-    return matches
-      .map((match) => [match.round, match.opponent, match.result, match.record].join('|'))
-      .join(' / ');
   }
 
   function buildHistoryCsv() {
@@ -332,6 +305,10 @@
 
   function normalizeText(text) {
     return (text || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function normalizeRecord(text) {
+    return normalizeText(text).replace(/\s*-\s*/g, '-');
   }
 
   function delay(ms) {
