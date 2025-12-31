@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Fab Monkey Army Knife (Sample)
 // @namespace    https://github.com/japan4415/fab-monkey-army-knife
-// @version      0.2.0
+// @version      0.2.1
 // @description  Improve the Flesh and Blood official site and GEM history UX.
 // @match        https://fabtcg.com/*
 // @match        https://www.fabtcg.com/*
@@ -20,7 +20,19 @@
   const UI_ID = 'fab-history-csv-export';
   const STATUS_ID = 'fab-history-csv-status';
   const COPY_ID = 'fab-history-csv-copy';
+  const HISTORY_COLUMNS = [
+    'event_id',
+    'date',
+    'title',
+    'start_time',
+    'store',
+    'event_type',
+    'format',
+    'xp_multiplier',
+    'rating',
+  ];
   let historyLoadPromise = null;
+  let historyEntries = [];
 
   if (location.hostname === 'gem.fabtcg.com' && HISTORY_PATH.test(location.pathname)) {
     setupHistoryExport();
@@ -100,274 +112,117 @@
 
   async function ensureHistoryLoaded() {
     if (!historyLoadPromise) {
-      historyLoadPromise = loadAllHistory().finally(() => {
-        const { count } = getHistoryRows();
-      setStatus(`Loaded (${count} rows)`);
-    });
-  }
+      historyLoadPromise = loadAllHistoryPages().then((entries) => {
+        historyEntries = entries;
+        setStatus(`Loaded (${entries.length} rows)`);
+        return entries;
+      });
+    }
     return historyLoadPromise;
   }
 
-  async function loadAllHistory() {
-    await waitForInitialRows();
-    let idleRounds = 0;
-    let previousCount = getHistoryRows().count;
-    for (let round = 0; round < 60; round += 1) {
-      const clicked = clickLoadMoreButtons();
-      await scrollToBottom();
-      const grew = await waitForRowGrowth(previousCount, 2000);
-      const currentCount = getHistoryRows().count;
-      if (currentCount > previousCount) {
-        previousCount = currentCount;
-        idleRounds = 0;
-      } else if (!clicked && !grew) {
-        idleRounds += 1;
-        if (idleRounds >= 3) {
-          break;
+  async function loadAllHistoryPages() {
+    const totalPages = getTotalPages(document);
+    const entries = [];
+    const seen = new Set();
+
+    const addEntries = (items) => {
+      for (const entry of items) {
+        const key = entryKey(entry);
+        if (!key || seen.has(key)) {
+          continue;
         }
+        seen.add(key);
+        entries.push(entry);
       }
-    }
-  }
-
-  async function waitForInitialRows() {
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-      const { count } = getHistoryRows();
-      if (count > 0) {
-        return;
-      }
-      await delay(250);
-    }
-  }
-
-  function clickLoadMoreButtons() {
-    const labels = ['Load more', 'Show more', 'More', 'View more'];
-    const buttons = Array.from(document.querySelectorAll('button, a'));
-    let clicked = false;
-    for (const button of buttons) {
-      const text = (button.textContent || '').trim();
-      if (!text) {
-        continue;
-      }
-      if (labels.some((label) => text.toLowerCase().includes(label.toLowerCase()))) {
-        if (!button.disabled) {
-          button.click();
-          clicked = true;
-        }
-      }
-    }
-    return clicked;
-  }
-
-  async function scrollToBottom() {
-    const scrollTarget = findScrollContainer();
-    if (!scrollTarget) {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-      await delay(300);
-      return;
-    }
-    scrollTarget.scrollTo({ top: scrollTarget.scrollHeight, behavior: 'smooth' });
-    await delay(300);
-  }
-
-  function findScrollContainer() {
-    const candidates = Array.from(document.querySelectorAll('*'));
-    let best = null;
-    let bestScore = 0;
-    for (const el of candidates) {
-      const style = window.getComputedStyle(el);
-      if (!['auto', 'scroll'].includes(style.overflowY)) {
-        continue;
-      }
-      const score = el.scrollHeight - el.clientHeight;
-      if (score > bestScore) {
-        bestScore = score;
-        best = el;
-      }
-    }
-    return bestScore > 200 ? best : null;
-  }
-
-  async function waitForRowGrowth(previousCount, timeoutMs) {
-    const container = getHistoryRows().container || document.body;
-    return new Promise((resolve) => {
-      let resolved = false;
-      const observer = new MutationObserver(() => {
-        const current = getHistoryRows().count;
-        if (current > previousCount) {
-          resolved = true;
-          observer.disconnect();
-          resolve(true);
-        }
-      });
-      observer.observe(container, { childList: true, subtree: true });
-      const timer = setTimeout(() => {
-        if (!resolved) {
-          observer.disconnect();
-          resolve(false);
-        }
-      }, timeoutMs);
-      if (resolved) {
-        clearTimeout(timer);
-      }
-    });
-  }
-
-  function getHistoryRows() {
-    const table = findBestTable();
-    if (table) {
-      return {
-        type: 'table',
-        table,
-        container: table.tBodies[0] || table,
-        headers: extractTableHeaders(table),
-        rows: Array.from((table.tBodies[0] || table).querySelectorAll('tr')),
-        count: (table.tBodies[0] || table).querySelectorAll('tr').length,
-      };
-    }
-
-    const roleGrid = findRoleGrid();
-    if (roleGrid) {
-      return roleGrid;
-    }
-
-    const list = findBestList();
-    if (list) {
-      return list;
-    }
-
-    return { type: 'unknown', rows: [], headers: ['entry'], count: 0, container: document.body };
-  }
-
-  function findBestTable() {
-    const tables = Array.from(document.querySelectorAll('main table, table'));
-    let best = null;
-    let bestRows = 0;
-    for (const table of tables) {
-      const rows = (table.tBodies[0] || table).querySelectorAll('tr').length;
-      if (rows > bestRows) {
-        best = table;
-        bestRows = rows;
-      }
-    }
-    return bestRows > 0 ? best : null;
-  }
-
-  function extractTableHeaders(table) {
-    const headers = Array.from(table.querySelectorAll('thead th')).map((cell) =>
-      normalizeText(cell.textContent)
-    );
-    if (headers.length > 0) {
-      return headers;
-    }
-    const firstRow = (table.tBodies[0] || table).querySelector('tr');
-    if (!firstRow) {
-      return [];
-    }
-    return Array.from(firstRow.querySelectorAll('th')).map((cell) =>
-      normalizeText(cell.textContent)
-    );
-  }
-
-  function findRoleGrid() {
-    const rows = Array.from(document.querySelectorAll('[role="row"]'));
-    const dataRows = rows.filter((row) =>
-      row.querySelector('[role="cell"], [role="gridcell"]')
-    );
-    if (dataRows.length === 0) {
-      return null;
-    }
-    const headerCells = Array.from(
-      document.querySelectorAll('[role="columnheader"]')
-    ).map((cell) => normalizeText(cell.textContent));
-    return {
-      type: 'role-grid',
-      rows: dataRows,
-      headers: headerCells,
-      count: dataRows.length,
-      container: dataRows[0].parentElement || document.body,
     };
+
+    setStatus(`Loading 1/${totalPages}...`);
+    addEntries(extractEventsFromDocument(document));
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      setStatus(`Loading ${page}/${totalPages}...`);
+      const doc = await fetchHistoryPage(page);
+      addEntries(extractEventsFromDocument(doc));
+      await delay(120);
+    }
+
+    return entries;
   }
 
-  function findBestList() {
-    const selectors = [
-      '[data-history-item]',
-      '.history-item',
-      '.history-row',
-      '.transaction-row',
-      '.profile-history-item',
-      'main li',
-    ];
-    let best = null;
-    let bestCount = 0;
-    for (const selector of selectors) {
-      const items = Array.from(document.querySelectorAll(selector)).filter(
-        (el) => normalizeText(el.textContent).length > 0
+  function entryKey(entry) {
+    if (entry.event_id) {
+      return `id:${entry.event_id}`;
+    }
+    return [
+      entry.date,
+      entry.title,
+      entry.start_time,
+      entry.store,
+    ].filter(Boolean).join('|');
+  }
+
+  async function fetchHistoryPage(page) {
+    const url = new URL('/profile/history/', location.origin);
+    if (page > 1) {
+      url.searchParams.set('page', String(page));
+    }
+    const response = await fetch(url.toString(), { credentials: 'include' });
+    if (!response.ok) {
+      throw new Error(`Failed to load page ${page}`);
+    }
+    const html = await response.text();
+    return new DOMParser().parseFromString(html, 'text/html');
+  }
+
+  function getTotalPages(doc) {
+    const links = Array.from(doc.querySelectorAll('.pagination a[href*="page="]'));
+    let maxPage = 1;
+    for (const link of links) {
+      const href = link.getAttribute('href');
+      if (!href) {
+        continue;
+      }
+      const url = new URL(href, location.origin);
+      const page = Number.parseInt(url.searchParams.get('page'), 10);
+      if (Number.isFinite(page) && page > maxPage) {
+        maxPage = page;
+      }
+    }
+    return maxPage;
+  }
+
+  function extractEventsFromDocument(doc) {
+    const events = Array.from(doc.querySelectorAll('.events .event'));
+    return events.map((event) => {
+      const metaItems = Array.from(event.querySelectorAll('.event__meta-item')).map(
+        (item) => normalizeText(item.textContent)
       );
-      if (items.length > bestCount) {
-        best = { selector, items };
-        bestCount = items.length;
-      }
-    }
-    if (!best || bestCount === 0) {
-      return null;
-    }
-    return {
-      type: 'list',
-      rows: best.items,
-      headers: ['entry'],
-      count: best.items.length,
-      container: best.items[0].parentElement || document.body,
-    };
+      const entry = {
+        event_id: normalizeText(event.getAttribute('id')),
+        date: normalizeText(event.querySelector('.event__when')?.textContent),
+        title: normalizeText(event.querySelector('.event__title')?.textContent),
+        start_time: metaItems[0] || '',
+        store: metaItems[1] || '',
+        event_type: metaItems[2] || '',
+        format: metaItems[3] || '',
+        xp_multiplier: metaItems[4] || '',
+        rating: metaItems[5] || '',
+      };
+      return entry;
+    }).filter((entry) => entry.title || entry.date);
   }
 
   function buildHistoryCsv() {
-    const { type, rows, headers } = getHistoryRows();
-    const csvRows = [];
-    const normalizedHeaders = headers && headers.length > 0 ? headers : null;
-
-    if (normalizedHeaders) {
-      csvRows.push(normalizedHeaders.map(csvEscape).join(','));
-    }
-
-    for (const row of rows) {
-      const values = extractRowValues(type, row, normalizedHeaders);
-      csvRows.push(values.map(csvEscape).join(','));
+    const entries = historyEntries.length
+      ? historyEntries
+      : extractEventsFromDocument(document);
+    const csvRows = [HISTORY_COLUMNS.join(',')];
+    for (const entry of entries) {
+      const values = HISTORY_COLUMNS.map((key) => csvEscape(entry[key] || ''));
+      csvRows.push(values.join(','));
     }
     return csvRows.join('\n');
-  }
-
-  function extractRowValues(type, row, headers) {
-    if (type === 'table') {
-      return Array.from(row.querySelectorAll('th, td')).map((cell) =>
-        normalizeText(cell.textContent)
-      );
-    }
-    if (type === 'role-grid') {
-      return Array.from(row.querySelectorAll('[role="cell"], [role="gridcell"]')).map(
-        (cell) => normalizeText(cell.textContent)
-      );
-    }
-
-    if (type === 'list' && headers && headers.length > 1) {
-      const values = [];
-      const labelElements = row.querySelectorAll('[data-label]');
-      if (labelElements.length > 0) {
-        const map = {};
-        for (const el of labelElements) {
-          const label = el.getAttribute('data-label');
-          if (!label) {
-            continue;
-          }
-          map[label] = normalizeText(el.textContent);
-        }
-        for (const header of headers) {
-          values.push(map[header] || '');
-        }
-        return values;
-      }
-    }
-
-    return [normalizeText(row.textContent)];
   }
 
   async function copyToClipboard(text) {
