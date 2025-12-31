@@ -6,6 +6,7 @@ This repo includes a sample script configured for automatic updates.
 ## Target site
 
 - https://fabtcg.com/
+- https://gem.fabtcg.com/
 
 ## Prerequisites
 
@@ -17,7 +18,7 @@ This repo includes a sample script configured for automatic updates.
    - https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife.user.js
 2. When the Tampermonkey install page opens, click Install.
 
-Note: The current script is a sample and does nothing yet.
+Note: The script includes a GEM history CSV export tool.
 
 ## Auto-update settings (important)
 
@@ -38,3 +39,10 @@ If this is off, `@updateURL` will not be checked.
 - `fab-monkey-army-knife.user.js`
   - Uses GitHub raw URLs for `@updateURL` / `@downloadURL`
   - Bump `@version` to trigger auto-update
+
+## GEM history CSV export
+
+On https://gem.fabtcg.com/profile/history/ the script:
+
+- Loads all history entries automatically
+- Adds a "Copy CSV" button to copy the full history
