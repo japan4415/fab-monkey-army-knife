@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Fab Monkey Army Knife (Sample)
 // @namespace    https://github.com/japan4415/fab-monkey-army-knife
-// @version      0.2.1
+// @version      0.2.2
 // @description  Improve the Flesh and Blood official site and GEM history UX.
 // @match        https://fabtcg.com/*
 // @match        https://www.fabtcg.com/*
@@ -30,6 +30,9 @@
     'format',
     'xp_multiplier',
     'rating',
+    'total_wins',
+    'total_xp',
+    'matches',
   ];
   let historyLoadPromise = null;
   let historyEntries = [];
@@ -198,6 +201,7 @@
       const metaItems = Array.from(event.querySelectorAll('.event__meta-item')).map(
         (item) => normalizeText(item.textContent)
       );
+      const results = extractResultsFromEvent(event);
       const entry = {
         event_id: normalizeText(event.getAttribute('id')),
         date: normalizeText(event.querySelector('.event__when')?.textContent),
@@ -208,9 +212,86 @@
         format: metaItems[3] || '',
         xp_multiplier: metaItems[4] || '',
         rating: metaItems[5] || '',
+        total_wins: results.total_wins,
+        total_xp: results.total_xp,
+        matches: results.matches,
       };
       return entry;
     }).filter((entry) => entry.title || entry.date);
+  }
+
+  function extractResultsFromEvent(event) {
+    const details = event.querySelector('.event__extra-details');
+    if (!details) {
+      return { total_wins: '', total_xp: '', matches: '' };
+    }
+    const tables = Array.from(details.querySelectorAll('table'));
+    const summary = parseSummaryTable(tables[0]);
+    const matches = parseMatchTable(tables[1]);
+    return {
+      total_wins: summary.total_wins,
+      total_xp: summary.total_xp,
+      matches: serializeMatches(matches),
+    };
+  }
+
+  function parseSummaryTable(table) {
+    if (!table) {
+      return { total_wins: '', total_xp: '' };
+    }
+    const summary = { total_wins: '', total_xp: '' };
+    const rows = Array.from(table.querySelectorAll('tr'));
+    for (const row of rows) {
+      const label = normalizeText(row.querySelector('th')?.textContent);
+      const value = normalizeText(row.querySelector('td')?.textContent);
+      if (!value) {
+        continue;
+      }
+      if (label.toLowerCase().includes('xp')) {
+        summary.total_xp = value;
+      } else if (!summary.total_wins) {
+        summary.total_wins = value;
+      }
+    }
+    return summary;
+  }
+
+  function parseMatchTable(table) {
+    if (!table) {
+      return [];
+    }
+    const rows = Array.from(table.querySelectorAll('tr'));
+    if (rows.length <= 1) {
+      return [];
+    }
+    const matches = [];
+    for (const row of rows.slice(1)) {
+      const cells = Array.from(row.querySelectorAll('td')).map((cell) =>
+        normalizeText(cell.textContent)
+      );
+      if (cells.length === 0) {
+        continue;
+      }
+      if (cells.length === 1 && !/\d/.test(cells[0])) {
+        continue;
+      }
+      matches.push({
+        round: cells[0] || '',
+        opponent: cells[1] || '',
+        result: cells[2] || '',
+        record: cells[3] || '',
+      });
+    }
+    return matches;
+  }
+
+  function serializeMatches(matches) {
+    if (!matches || matches.length === 0) {
+      return '';
+    }
+    return matches
+      .map((match) => [match.round, match.opponent, match.result, match.record].join('|'))
+      .join(' / ');
   }
 
   function buildHistoryCsv() {
