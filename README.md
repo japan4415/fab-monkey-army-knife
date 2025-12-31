@@ -46,4 +46,5 @@ On https://gem.fabtcg.com/profile/history/ the script:
 
 - Loads all history entries automatically
 - Adds a "Copy CSV" button to copy the full history
-- Includes match results when available
+- Exports columns: `title`, `start_time`, `store`, `event_type`, `format`, `match_record`
+- `match_record` is the final wins-losses record (for example, `4-2`)
