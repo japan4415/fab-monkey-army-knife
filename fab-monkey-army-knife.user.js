@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Fab Monkey Army Knife (Sample)
 // @namespace    https://github.com/japan4415/fab-monkey-army-knife
-// @version      0.2.3
+// @version      0.2.4
 // @description  Improve the Flesh and Blood official site and GEM history UX.
 // @match        https://fabtcg.com/*
 // @match        https://www.fabtcg.com/*
