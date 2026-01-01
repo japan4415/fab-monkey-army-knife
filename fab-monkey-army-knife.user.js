@@ -51,7 +51,7 @@
     wrapper.id = UI_ID;
     wrapper.style.position = 'fixed';
     wrapper.style.right = '16px';
-    wrapper.style.bottom = '16px';
+    wrapper.style.top = '16px';
     wrapper.style.zIndex = '99999';
     wrapper.style.display = 'flex';
     wrapper.style.flexDirection = 'column';
