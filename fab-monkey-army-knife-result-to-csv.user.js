@@ -1,17 +1,14 @@
 // ==UserScript==
-// @name         Fab Monkey Army Knife (Sample)
+// @name         Fab Monkey Army Knife - Result to CSV
 // @namespace    https://github.com/japan4415/fab-monkey-army-knife
-// @version      0.3.0
-// @description  Improve the Flesh and Blood official site and GEM history UX.
-// @match        https://fabtcg.com/*
-// @match        https://www.fabtcg.com/*
-// @match        https://cardvault.fabtcg.com/*
+// @version      0.1.0
+// @description  Export GEM history results to CSV.
 // @match        https://gem.fabtcg.com/profile/history*
 // @icon         https://fabtcg.com/favicon.ico
 // @grant        none
 // @run-at       document-idle
-// @updateURL    https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife.user.js
-// @downloadURL  https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife.user.js
+// @updateURL    https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife-result-to-csv.user.js
+// @downloadURL  https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife-result-to-csv.user.js
 // ==/UserScript==
 
 (() => {
@@ -21,11 +18,6 @@
   const UI_ID = 'fab-history-csv-export';
   const STATUS_ID = 'fab-history-csv-status';
   const COPY_ID = 'fab-history-csv-copy';
-  const CARDVAULT_PATH = /^\/card\//;
-  const CARD_UI_ID = 'fab-cardvault-image-export';
-  const CARD_STATUS_ID = 'fab-cardvault-image-status';
-  const CARD_FRONT_COPY_ID = 'fab-cardvault-image-front-copy';
-  const CARD_BACK_COPY_ID = 'fab-cardvault-image-back-copy';
   const HISTORY_COLUMNS = [
     'title',
     'start_time',
@@ -37,13 +29,11 @@
   let historyLoadPromise = null;
   let historyEntries = [];
 
-  if (location.hostname === 'gem.fabtcg.com' && HISTORY_PATH.test(location.pathname)) {
-    setupHistoryExport();
+  if (!HISTORY_PATH.test(location.pathname)) {
+    return;
   }
 
-  if (location.hostname === 'cardvault.fabtcg.com' && CARDVAULT_PATH.test(location.pathname)) {
-    setupCardImageExport();
-  }
+  setupHistoryExport();
 
   function setupHistoryExport() {
     ensureHistoryUi();
@@ -114,131 +104,6 @@
     const status = document.getElementById(STATUS_ID);
     if (status) {
       status.textContent = message;
-    }
-  }
-
-  function setCardStatus(message) {
-    const status = document.getElementById(CARD_STATUS_ID);
-    if (status) {
-      status.textContent = message;
-    }
-  }
-
-  function setupCardImageExport() {
-    ensureCardImageUi();
-    const urls = findCardImageUrls();
-    if (urls.front || urls.back) {
-      setCardStatus('Ready.');
-    } else {
-      setCardStatus('Images not found.');
-    }
-  }
-
-  function ensureCardImageUi() {
-    if (document.getElementById(CARD_UI_ID)) {
-      return;
-    }
-
-    const wrapper = document.createElement('div');
-    wrapper.id = CARD_UI_ID;
-    wrapper.style.position = 'fixed';
-    wrapper.style.right = '16px';
-    wrapper.style.top = '16px';
-    wrapper.style.zIndex = '99999';
-    wrapper.style.display = 'flex';
-    wrapper.style.flexDirection = 'column';
-    wrapper.style.gap = '6px';
-    wrapper.style.padding = '10px';
-    wrapper.style.background = 'rgba(20, 20, 20, 0.85)';
-    wrapper.style.borderRadius = '8px';
-    wrapper.style.color = '#fff';
-    wrapper.style.fontSize = '12px';
-    wrapper.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-    wrapper.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.25)';
-
-    const frontButton = document.createElement('button');
-    frontButton.id = CARD_FRONT_COPY_ID;
-    frontButton.type = 'button';
-    frontButton.textContent = 'Copy Front URL';
-    styleActionButton(frontButton);
-    frontButton.addEventListener('click', () => copyCardImageUrl('front', frontButton));
-
-    const backButton = document.createElement('button');
-    backButton.id = CARD_BACK_COPY_ID;
-    backButton.type = 'button';
-    backButton.textContent = 'Copy Back URL';
-    styleActionButton(backButton);
-    backButton.addEventListener('click', () => copyCardImageUrl('back', backButton));
-
-    const status = document.createElement('div');
-    status.id = CARD_STATUS_ID;
-    status.textContent = 'Preparing...';
-
-    wrapper.append(frontButton, backButton, status);
-    document.body.append(wrapper);
-  }
-
-  function styleActionButton(button) {
-    button.style.cursor = 'pointer';
-    button.style.border = 'none';
-    button.style.borderRadius = '6px';
-    button.style.padding = '8px 12px';
-    button.style.fontSize = '13px';
-    button.style.fontWeight = '600';
-    button.style.background = '#f1c40f';
-    button.style.color = '#111';
-  }
-
-  async function copyCardImageUrl(side, button) {
-    const label = side === 'front' ? 'Front' : 'Back';
-    button.disabled = true;
-    button.textContent = `Copying ${label}...`;
-    try {
-      const urls = findCardImageUrls();
-      const url = side === 'front' ? urls.front : urls.back;
-      if (!url) {
-        throw new Error(`${label} image not found`);
-      }
-      await copyToClipboard(url);
-      setCardStatus(`Copied ${label} URL`);
-    } catch (error) {
-      setCardStatus(`Copy failed: ${error.message}`);
-    } finally {
-      button.disabled = false;
-      button.textContent = `Copy ${label} URL`;
-    }
-  }
-
-  function findCardImageUrls() {
-    const images = Array.from(document.querySelectorAll('img'));
-    const frontImage = images.find((img) => isFrontCardImage(img));
-    const backImage = images.find((img) => isBackCardImage(img));
-    return {
-      front: resolveUrl(frontImage?.getAttribute('src')),
-      back: resolveUrl(backImage?.getAttribute('src')),
-    };
-  }
-
-  function isFrontCardImage(img) {
-    const alt = (img.getAttribute('alt') || '').toLowerCase();
-    const src = img.getAttribute('src') || '';
-    return alt.includes('card front') || /\/media\/cards\//.test(src);
-  }
-
-  function isBackCardImage(img) {
-    const alt = (img.getAttribute('alt') || '').toLowerCase();
-    const src = img.getAttribute('src') || '';
-    return alt.includes('card back') || /card_back/.test(src);
-  }
-
-  function resolveUrl(value) {
-    if (!value) {
-      return '';
-    }
-    try {
-      return new URL(value, location.origin).toString();
-    } catch (error) {
-      return value;
     }
   }
 
