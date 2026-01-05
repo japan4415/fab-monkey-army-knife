@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Fab Monkey Army Knife - Image Downloader
 // @namespace    https://github.com/japan4415/fab-monkey-army-knife
-// @version      0.1.3
+// @version      0.1.4
 // @description  Copy card front/back image URLs from Card Vault.
 // @match        https://cardvault.fabtcg.com/*
 // @icon         https://fabtcg.com/favicon.ico
@@ -23,19 +23,44 @@
   const BACK_COPY_ID = 'fab-cardvault-image-back-copy';
   const FRONT_PNG_DOWNLOAD_ID = 'fab-cardvault-image-front-png-download';
   const BACK_PNG_DOWNLOAD_ID = 'fab-cardvault-image-back-png-download';
+  const ROUTE_POLL_MS = 300;
+  let lastUrl = location.href;
+  let routePollId = null;
+  let imageObserver = null;
+  let imageObserverTimeoutId = null;
 
-  if (!CARDVAULT_PATH.test(location.pathname)) {
-    return;
-  }
+  setupRouteWatcher();
+  init();
 
-  setupCardImageExport();
-
-  function setupCardImageExport() {
+  function init() {
+    cleanupImageObserver();
+    if (!CARDVAULT_PATH.test(location.pathname)) {
+      removeCardImageUi();
+      return;
+    }
     ensureCardImageUi();
     setStatus('Waiting for images...');
     if (!updateStatusIfReady()) {
       observeCardImages();
     }
+  }
+
+  function setupRouteWatcher() {
+    if (routePollId) {
+      return;
+    }
+    routePollId = setInterval(() => {
+      if (location.href === lastUrl) {
+        return;
+      }
+      lastUrl = location.href;
+      init();
+    }, ROUTE_POLL_MS);
+    window.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        init();
+      }
+    });
   }
 
   function ensureCardImageUi() {
@@ -96,6 +121,13 @@
     document.body.append(wrapper);
   }
 
+  function removeCardImageUi() {
+    const wrapper = document.getElementById(UI_ID);
+    if (wrapper) {
+      wrapper.remove();
+    }
+  }
+
   function styleActionButton(button) {
     button.style.cursor = 'pointer';
     button.style.border = 'none';
@@ -124,9 +156,11 @@
   }
 
   function observeCardImages() {
+    cleanupImageObserver();
     const observer = new MutationObserver(() => {
       if (updateStatusIfReady()) {
         observer.disconnect();
+        imageObserver = null;
       }
     });
     observer.observe(document.body, {
@@ -135,12 +169,24 @@
       attributes: true,
       attributeFilter: ['src', 'srcset', 'data-src', 'data-srcset'],
     });
-    setTimeout(() => {
-      observer.disconnect();
+    imageObserver = observer;
+    imageObserverTimeoutId = setTimeout(() => {
+      cleanupImageObserver();
       if (!updateStatusIfReady()) {
         setStatus('Images not found.');
       }
     }, 5000);
+  }
+
+  function cleanupImageObserver() {
+    if (imageObserver) {
+      imageObserver.disconnect();
+      imageObserver = null;
+    }
+    if (imageObserverTimeoutId) {
+      clearTimeout(imageObserverTimeoutId);
+      imageObserverTimeoutId = null;
+    }
   }
 
   async function copyCardImageUrl(side, button) {

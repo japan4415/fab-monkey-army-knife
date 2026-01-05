@@ -20,6 +20,8 @@ This repo includes scripts configured for automatic updates.
      - https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife-result-to-csv.user.js
    - Card Vault image URL copier:
      - https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife-image-downloader.user.js
+   - Card Vault artist link:
+     - https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife-artist-linker.user.js
 2. When the Tampermonkey install page opens, click Install.
 
 Note: If you also install the legacy combined script, the UI can appear twice.
@@ -44,6 +46,8 @@ If this is off, `@updateURL` will not be checked.
   - GEM history CSV export
 - `fab-monkey-army-knife-image-downloader.user.js`
   - Card Vault card image URL copy (front/back)
+- `fab-monkey-army-knife-artist-linker.user.js`
+  - Card Vault “Art by ...” link to artist search
 - `fab-monkey-army-knife.user.js` (legacy combined script)
   - Uses GitHub raw URLs for `@updateURL` / `@downloadURL`
   - Bump `@version` to trigger auto-update
@@ -63,3 +67,10 @@ On https://cardvault.fabtcg.com/card/... the script:
 
 - Adds buttons to copy the front and back image URLs
 - Supports both absolute and relative image paths
+
+## Card Vault artist link
+
+On https://cardvault.fabtcg.com/card/... the script:
+
+- Turns the “Art by ...” line into a link
+- Links to `https://cardvault.fabtcg.com/results?page=1&artist_name=...`
