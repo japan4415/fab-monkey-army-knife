@@ -1,12 +1,13 @@
 # fab-monkey-army-knife
 
 Tampermonkey scripts to improve the official Flesh and Blood website.
-This repo includes a sample script configured for automatic updates.
+This repo includes scripts configured for automatic updates.
 
 ## Target site
 
 - https://fabtcg.com/
 - https://gem.fabtcg.com/
+- https://cardvault.fabtcg.com/
 
 ## Prerequisites
 
@@ -15,10 +16,13 @@ This repo includes a sample script configured for automatic updates.
 ## Install
 
 1. Open the raw script URL in your browser (use `raw`, not `blob`).
-   - https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife.user.js
+   - GEM history CSV export:
+     - https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife-result-to-csv.user.js
+   - Card Vault image URL copier:
+     - https://github.com/japan4415/fab-monkey-army-knife/raw/main/fab-monkey-army-knife-image-downloader.user.js
 2. When the Tampermonkey install page opens, click Install.
 
-Note: The script includes a GEM history CSV export tool.
+Note: If you also install the legacy combined script, the UI can appear twice.
 
 ## Auto-update settings (important)
 
@@ -36,7 +40,11 @@ If this is off, `@updateURL` will not be checked.
 
 ## Scripts
 
-- `fab-monkey-army-knife.user.js`
+- `fab-monkey-army-knife-result-to-csv.user.js`
+  - GEM history CSV export
+- `fab-monkey-army-knife-image-downloader.user.js`
+  - Card Vault card image URL copy (front/back)
+- `fab-monkey-army-knife.user.js` (legacy combined script)
   - Uses GitHub raw URLs for `@updateURL` / `@downloadURL`
   - Bump `@version` to trigger auto-update
 
@@ -48,3 +56,10 @@ On https://gem.fabtcg.com/profile/history/ the script:
 - Adds a "Copy CSV" button to copy the full history
 - Exports columns: `title`, `start_time`, `store`, `event_type`, `format`, `match_record`
 - `match_record` is the final wins-losses record (for example, `4-2`)
+
+## Card Vault image URL copy
+
+On https://cardvault.fabtcg.com/card/... the script:
+
+- Adds buttons to copy the front and back image URLs
+- Supports both absolute and relative image paths
